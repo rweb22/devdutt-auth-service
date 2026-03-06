@@ -6,31 +6,61 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
       - NODE_ENV=development
+      - PORT=3001
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=devdutt
+      - DB_PASSWORD=devdutt_secret
+      - DB_NAME=devdutt_auth
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_PRIVATE_KEY_PATH=/app/keys/private.pem
+      - JWT_PUBLIC_KEY_PATH=/app/keys/public.pem
+      - CORS_ORIGIN=http://localhost:3000
     volumes:
       - .:/app
       - /app/node_modules
+      - ./keys:/app/keys
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: devdutt
       POSTGRES_PASSWORD: devdutt_secret
-      POSTGRES_DB: devdutt_institute
+      POSTGRES_DB: devdutt_auth
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devdutt -d devdutt_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
